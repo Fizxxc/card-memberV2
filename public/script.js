@@ -1,8 +1,4 @@
-// Import Firebase (this would be handled differently in a real project)
-// In a real project, you would use modules or a bundler
-// For this example, we'll assume Firebase is loaded via CDN in HTML
-
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const rfidInput = document.getElementById('rfid');
     const nameInput = document.getElementById('name');
@@ -16,331 +12,235 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('search');
     const searchBtn = document.getElementById('searchBtn');
     const membersList = document.getElementById('membersList');
-
+    
     // Preview Elements
     const previewRfid = document.getElementById('previewRfid');
     const previewName = document.getElementById('previewName');
     const previewPhone = document.getElementById('previewPhone');
     const previewPoints = document.getElementById('previewPoints');
-
+    
     // Current selected member
     let selectedMember = null;
-
+    
     // Initialize
     loadMembers();
     setupEventListeners();
-
+    
     function setupEventListeners() {
-        // RFID input simulation (in a real app, this would come from an RFID reader)
-        rfidInput.addEventListener('change', function () {
-            // Simulate finding a member when RFID is scanned
+        rfidInput.addEventListener('change', function() {
             findMemberByRfid(this.value);
         });
-
-        // Form inputs - update preview card
+        
         nameInput.addEventListener('input', updatePreview);
         phoneInput.addEventListener('input', updatePreview);
         pointsInput.addEventListener('input', updatePreview);
         rfidInput.addEventListener('input', updatePreview);
-
-        // Button clicks
+        
         addBtn.addEventListener('click', addMember);
         updateBtn.addEventListener('click', updateMember);
         deleteBtn.addEventListener('click', deleteMember);
         clearBtn.addEventListener('click', clearForm);
         searchBtn.addEventListener('click', searchMembers);
-        searchInput.addEventListener('keypress', function (e) {
+        searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') searchMembers();
         });
     }
-
+    
     function updatePreview() {
         previewRfid.textContent = rfidInput.value || '-';
         previewName.textContent = nameInput.value || '-';
         previewPhone.textContent = phoneInput.value || '-';
         previewPoints.textContent = pointsInput.value || '0';
     }
-
+    
     async function loadMembers() {
         try {
             const response = await fetch('/api/getMembers');
+            
+            // Check if response is OK (status 200-299)
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            // Check content type
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Expected JSON but got: ${contentType}`);
+            }
+            
             const members = await response.json();
-
-            if (members) {
+            
+            if (members && Object.keys(members).length > 0) {
                 renderMembersList(members);
             } else {
                 membersList.innerHTML = '<p class="no-members">Tidak ada member terdaftar</p>';
             }
         } catch (error) {
             console.error('Error loading members:', error);
-            Swal.fire({
-                title: 'Error!',
-                text: 'Gagal memuat data member',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
+            showError('Gagal memuat data member', error.message);
         }
     }
-
+    
     function renderMembersList(members) {
         membersList.innerHTML = '';
-
-        if (Object.keys(members).length === 0) {
+        
+        if (!members || Object.keys(members).length === 0) {
             membersList.innerHTML = '<p class="no-members">Tidak ada member terdaftar</p>';
             return;
         }
-
+        
         Object.entries(members).forEach(([rfid, member]) => {
             const memberItem = document.createElement('div');
             memberItem.className = 'member-item';
             memberItem.dataset.rfid = rfid;
-
+            
             memberItem.innerHTML = `
                 <div class="member-info">
-                    <h3>${member.name || 'N/A'}</h3>
-                    <p>RFID: ${rfid} | Telp: ${member.phone || 'N/A'} | Poin: ${member.points || 0}</p>
+                    <h3>${escapeHtml(member.name || 'N/A')}</h3>
+                    <p>RFID: ${escapeHtml(rfid)} | Telp: ${escapeHtml(member.phone || 'N/A')} | Poin: ${member.points || 0}</p>
                 </div>
                 <div class="member-actions">
                     <button class="edit-btn" title="Edit"><i class="fas fa-edit"></i></button>
                     <button class="delete-btn" title="Hapus"><i class="fas fa-trash"></i></button>
                 </div>
             `;
-
+            
             membersList.appendChild(memberItem);
-
-            // Add event listeners to the new buttons
+            
             memberItem.querySelector('.edit-btn').addEventListener('click', () => editMember(rfid, member));
             memberItem.querySelector('.delete-btn').addEventListener('click', () => confirmDeleteMember(rfid, member.name));
         });
     }
-
+    
     async function findMemberByRfid(rfid) {
+        if (!rfid) return;
+        
         try {
             const response = await fetch(`/api/getMember?rfid=${encodeURIComponent(rfid)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Expected JSON but got: ${contentType}`);
+            }
+            
             const member = await response.json();
-
+            
             if (member) {
-                // Member found, populate form
                 selectedMember = { rfid, ...member };
-                nameInput.value = member.name || '';
-                phoneInput.value = member.phone || '';
-                emailInput.value = member.email || '';
-                pointsInput.value = member.points || 0;
-
-                // Enable update and delete buttons
+                populateForm(member);
+                
                 updateBtn.disabled = false;
                 deleteBtn.disabled = false;
                 addBtn.disabled = true;
-
-                // Update preview
+                
                 updatePreview();
-
-                // Show success message
-                Swal.fire({
-                    title: 'Member Ditemukan!',
-                    text: `Member ${member.name} ditemukan`,
-                    icon: 'success',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
+                
+                showSuccess(`Member ${member.name} ditemukan`);
             } else {
-                // No member found, prepare for new member
-                selectedMember = null;
-                nameInput.value = '';
-                phoneInput.value = '';
-                emailInput.value = '';
-                pointsInput.value = 0;
-
-                // Disable update and delete buttons
-                updateBtn.disabled = true;
-                deleteBtn.disabled = true;
-                addBtn.disabled = false;
-
-                // Focus on name input for quick entry
-                nameInput.focus();
-
-                // Update preview with just RFID
-                updatePreview();
-
-                // Show info message
-                Swal.fire({
-                    title: 'Member Baru',
-                    text: 'RFID tidak terdaftar, silahkan isi data member baru',
-                    icon: 'info',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
+                prepareForNewMember();
+                showInfo('RFID tidak terdaftar, silahkan isi data member baru');
             }
         } catch (error) {
             console.error('Error finding member:', error);
-            Swal.fire({
-                title: 'Error!',
-                text: 'Gagal mencari member',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
+            showError('Gagal mencari member', error.message);
         }
     }
-
+    
+    function populateForm(member) {
+        nameInput.value = member.name || '';
+        phoneInput.value = member.phone || '';
+        emailInput.value = member.email || '';
+        pointsInput.value = member.points || 0;
+    }
+    
+    function prepareForNewMember() {
+        selectedMember = null;
+        nameInput.value = '';
+        phoneInput.value = '';
+        emailInput.value = '';
+        pointsInput.value = 0;
+        
+        updateBtn.disabled = true;
+        deleteBtn.disabled = true;
+        addBtn.disabled = false;
+        
+        nameInput.focus();
+    }
+    
     async function addMember() {
-        const rfid = rfidInput.value.trim();
-        const name = nameInput.value.trim();
-        const phone = phoneInput.value.trim();
-        const email = emailInput.value.trim();
-        const points = parseInt(pointsInput.value) || 0;
-
-        if (!rfid) {
-            Swal.fire({
-                title: 'Error!',
-                text: 'RFID tidak boleh kosong',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
-            rfidInput.focus();
-            return;
-        }
-
-        if (!name) {
-            Swal.fire({
-                title: 'Error!',
-                text: 'Nama tidak boleh kosong',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
-            nameInput.focus();
-            return;
-        }
-
+        const memberData = validateMemberInput();
+        if (!memberData) return;
+        
         try {
             const response = await fetch('/api/addMember', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    rfid,
-                    name,
-                    phone,
-                    email,
-                    points
-                })
+                body: JSON.stringify(memberData)
             });
-
-            // Tambahkan pengecekan response.ok
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Gagal menambahkan member');
-            }
-
-            const result = await response.json();
-
-            Swal.fire({
-                title: 'Sukses!',
-                text: result.message || 'Member berhasil ditambahkan',
-                icon: 'success',
-                confirmButtonText: 'OK'
-            });
-
-            // Reload members list
+            
+            await handleApiResponse(response, 'Member berhasil ditambahkan');
             loadMembers();
-
-            // Clear form
             clearForm();
         } catch (error) {
             console.error('Error adding member:', error);
-            Swal.fire({
-                title: 'Error!',
-                text: error.message,
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
+            showError('Gagal menambahkan member', error.message);
         }
     }
-
-    function editMember(rfid, member) {
-        selectedMember = { rfid, ...member };
-        rfidInput.value = rfid;
-        nameInput.value = member.name || '';
-        phoneInput.value = member.phone || '';
-        emailInput.value = member.email || '';
-        pointsInput.value = member.points || 0;
-
-        // Enable update and delete buttons
-        updateBtn.disabled = false;
-        deleteBtn.disabled = false;
-        addBtn.disabled = true;
-
-        // Update preview
-        updatePreview();
-
-        // Scroll to form
-        rfidInput.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    async function updateMember() {
-        if (!selectedMember) return;
-
+    
+    function validateMemberInput() {
         const rfid = rfidInput.value.trim();
         const name = nameInput.value.trim();
         const phone = phoneInput.value.trim();
         const email = emailInput.value.trim();
         const points = parseInt(pointsInput.value) || 0;
-
-        if (!name) {
-            Swal.fire({
-                title: 'Error!',
-                text: 'Nama tidak boleh kosong',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
-            nameInput.focus();
-            return;
+        
+        if (!rfid) {
+            showError('RFID tidak boleh kosong');
+            rfidInput.focus();
+            return null;
         }
-
+        
+        if (!name) {
+            showError('Nama tidak boleh kosong');
+            nameInput.focus();
+            return null;
+        }
+        
+        return { rfid, name, phone, email, points };
+    }
+    
+    async function updateMember() {
+        if (!selectedMember) return;
+        
+        const memberData = validateMemberInput();
+        if (!memberData) return;
+        
         try {
             const response = await fetch('/api/updateMember', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    rfid,
-                    name,
-                    phone,
-                    email,
-                    points
-                })
+                body: JSON.stringify(memberData)
             });
-
-            const result = await response.json();
-
-            if (result.success) {
-                Swal.fire({
-                    title: 'Sukses!',
-                    text: 'Member berhasil diperbarui',
-                    icon: 'success',
-                    confirmButtonText: 'OK'
-                });
-
-                // Reload members list
-                loadMembers();
-
-                // Clear form
-                clearForm();
-            } else {
-                throw new Error(result.error || 'Gagal memperbarui member');
-            }
+            
+            await handleApiResponse(response, 'Member berhasil diperbarui');
+            loadMembers();
+            clearForm();
         } catch (error) {
             console.error('Error updating member:', error);
-            Swal.fire({
-                title: 'Error!',
-                text: error.message,
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
+            showError('Gagal memperbarui member', error.message);
         }
     }
-
+    
     function confirmDeleteMember(rfid, name) {
         Swal.fire({
             title: 'Hapus Member?',
@@ -357,11 +257,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-
+    
     async function deleteMember(rfid = null) {
         const memberRfid = rfid || selectedMember?.rfid;
         if (!memberRfid) return;
-
+        
         try {
             const response = await fetch('/api/deleteMember', {
                 method: 'POST',
@@ -370,67 +270,68 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 body: JSON.stringify({ rfid: memberRfid })
             });
-
-            const result = await response.json();
-
-            if (result.success) {
-                Swal.fire({
-                    title: 'Dihapus!',
-                    text: 'Member berhasil dihapus',
-                    icon: 'success',
-                    confirmButtonText: 'OK'
-                });
-
-                // Reload members list
-                loadMembers();
-
-                // Clear form
-                clearForm();
-            } else {
-                throw new Error(result.error || 'Gagal menghapus member');
-            }
+            
+            await handleApiResponse(response, 'Member berhasil dihapus');
+            loadMembers();
+            clearForm();
         } catch (error) {
             console.error('Error deleting member:', error);
-            Swal.fire({
-                title: 'Error!',
-                text: error.message,
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
+            showError('Gagal menghapus member', error.message);
         }
     }
-
+    
+    async function handleApiResponse(response, successMessage) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ 
+                error: `HTTP error! status: ${response.status}`
+            }));
+            throw new Error(error.error || 'Request failed');
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error(`Expected JSON but got: ${contentType}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result && result.success) {
+            showSuccess(successMessage);
+            return result;
+        } else {
+            throw new Error(result.error || 'Operation failed');
+        }
+    }
+    
     function clearForm() {
         rfidInput.value = '';
         nameInput.value = '';
         phoneInput.value = '';
         emailInput.value = '';
         pointsInput.value = '0';
-
+        
         selectedMember = null;
-
+        
         updateBtn.disabled = true;
         deleteBtn.disabled = true;
         addBtn.disabled = false;
-
-        updatePreview();
-
-        // Focus on RFID input for next scan
+        
         rfidInput.focus();
+        updatePreview();
     }
-
+    
     async function searchMembers() {
         const query = searchInput.value.trim().toLowerCase();
-
+        
         if (!query) {
             loadMembers();
             return;
         }
-
+        
         try {
             const response = await fetch('/api/getMembers');
             const members = await response.json();
-
+            
             if (members) {
                 const filteredMembers = Object.entries(members).reduce((acc, [rfid, member]) => {
                     if (
@@ -443,24 +344,58 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     return acc;
                 }, {});
-
+                
                 renderMembersList(filteredMembers);
             }
         } catch (error) {
             console.error('Error searching members:', error);
-            Swal.fire({
-                title: 'Error!',
-                text: 'Gagal mencari member',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
+            showError('Gagal mencari member', error.message);
         }
     }
-
+    
+    // Helper functions
+    function showError(title, message = '') {
+        Swal.fire({
+            title: title,
+            text: message,
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    }
+    
+    function showSuccess(message) {
+        Swal.fire({
+            title: 'Sukses!',
+            text: message,
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }
+    
+    function showInfo(message) {
+        Swal.fire({
+            title: 'Info',
+            text: message,
+            icon: 'info',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }
+    
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe.toString()
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+    
     // Animation for barcode lines
     const barcodeLines = document.querySelectorAll('.barcode-line');
     barcodeLines.forEach((line, index) => {
-        // Random delay for each line
         line.style.animationDelay = `${index * 0.1}s`;
     });
 });
