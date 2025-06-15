@@ -2,7 +2,7 @@
 // In a real project, you would use modules or a bundler
 // For this example, we'll assume Firebase is loaded via CDN in HTML
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // DOM Elements
     const rfidInput = document.getElementById('rfid');
     const nameInput = document.getElementById('name');
@@ -16,56 +16,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search');
     const searchBtn = document.getElementById('searchBtn');
     const membersList = document.getElementById('membersList');
-    
+
     // Preview Elements
     const previewRfid = document.getElementById('previewRfid');
     const previewName = document.getElementById('previewName');
     const previewPhone = document.getElementById('previewPhone');
     const previewPoints = document.getElementById('previewPoints');
-    
+
     // Current selected member
     let selectedMember = null;
-    
+
     // Initialize
     loadMembers();
     setupEventListeners();
-    
+
     function setupEventListeners() {
         // RFID input simulation (in a real app, this would come from an RFID reader)
-        rfidInput.addEventListener('change', function() {
+        rfidInput.addEventListener('change', function () {
             // Simulate finding a member when RFID is scanned
             findMemberByRfid(this.value);
         });
-        
+
         // Form inputs - update preview card
         nameInput.addEventListener('input', updatePreview);
         phoneInput.addEventListener('input', updatePreview);
         pointsInput.addEventListener('input', updatePreview);
         rfidInput.addEventListener('input', updatePreview);
-        
+
         // Button clicks
         addBtn.addEventListener('click', addMember);
         updateBtn.addEventListener('click', updateMember);
         deleteBtn.addEventListener('click', deleteMember);
         clearBtn.addEventListener('click', clearForm);
         searchBtn.addEventListener('click', searchMembers);
-        searchInput.addEventListener('keypress', function(e) {
+        searchInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') searchMembers();
         });
     }
-    
+
     function updatePreview() {
         previewRfid.textContent = rfidInput.value || '-';
         previewName.textContent = nameInput.value || '-';
         previewPhone.textContent = phoneInput.value || '-';
         previewPoints.textContent = pointsInput.value || '0';
     }
-    
+
     async function loadMembers() {
         try {
             const response = await fetch('/api/getMembers');
             const members = await response.json();
-            
+
             if (members) {
                 renderMembersList(members);
             } else {
@@ -81,20 +81,20 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    
+
     function renderMembersList(members) {
         membersList.innerHTML = '';
-        
+
         if (Object.keys(members).length === 0) {
             membersList.innerHTML = '<p class="no-members">Tidak ada member terdaftar</p>';
             return;
         }
-        
+
         Object.entries(members).forEach(([rfid, member]) => {
             const memberItem = document.createElement('div');
             memberItem.className = 'member-item';
             memberItem.dataset.rfid = rfid;
-            
+
             memberItem.innerHTML = `
                 <div class="member-info">
                     <h3>${member.name || 'N/A'}</h3>
@@ -105,20 +105,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button class="delete-btn" title="Hapus"><i class="fas fa-trash"></i></button>
                 </div>
             `;
-            
+
             membersList.appendChild(memberItem);
-            
+
             // Add event listeners to the new buttons
             memberItem.querySelector('.edit-btn').addEventListener('click', () => editMember(rfid, member));
             memberItem.querySelector('.delete-btn').addEventListener('click', () => confirmDeleteMember(rfid, member.name));
         });
     }
-    
+
     async function findMemberByRfid(rfid) {
         try {
             const response = await fetch(`/api/getMember?rfid=${encodeURIComponent(rfid)}`);
             const member = await response.json();
-            
+
             if (member) {
                 // Member found, populate form
                 selectedMember = { rfid, ...member };
@@ -126,15 +126,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 phoneInput.value = member.phone || '';
                 emailInput.value = member.email || '';
                 pointsInput.value = member.points || 0;
-                
+
                 // Enable update and delete buttons
                 updateBtn.disabled = false;
                 deleteBtn.disabled = false;
                 addBtn.disabled = true;
-                
+
                 // Update preview
                 updatePreview();
-                
+
                 // Show success message
                 Swal.fire({
                     title: 'Member Ditemukan!',
@@ -150,18 +150,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 phoneInput.value = '';
                 emailInput.value = '';
                 pointsInput.value = 0;
-                
+
                 // Disable update and delete buttons
                 updateBtn.disabled = true;
                 deleteBtn.disabled = true;
                 addBtn.disabled = false;
-                
+
                 // Focus on name input for quick entry
                 nameInput.focus();
-                
+
                 // Update preview with just RFID
                 updatePreview();
-                
+
                 // Show info message
                 Swal.fire({
                     title: 'Member Baru',
@@ -181,14 +181,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    
+
     async function addMember() {
         const rfid = rfidInput.value.trim();
         const name = nameInput.value.trim();
         const phone = phoneInput.value.trim();
         const email = emailInput.value.trim();
         const points = parseInt(pointsInput.value) || 0;
-        
+
         if (!rfid) {
             Swal.fire({
                 title: 'Error!',
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
             rfidInput.focus();
             return;
         }
-        
+
         if (!name) {
             Swal.fire({
                 title: 'Error!',
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nameInput.focus();
             return;
         }
-        
+
         try {
             const response = await fetch('/api/addMember', {
                 method: 'POST',
@@ -225,25 +225,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     points
                 })
             });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                Swal.fire({
-                    title: 'Sukses!',
-                    text: 'Member berhasil ditambahkan',
-                    icon: 'success',
-                    confirmButtonText: 'OK'
-                });
-                
-                // Reload members list
-                loadMembers();
-                
-                // Clear form
-                clearForm();
-            } else {
-                throw new Error(result.error || 'Gagal menambahkan member');
+
+            // Tambahkan pengecekan response.ok
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Gagal menambahkan member');
             }
+
+            const result = await response.json();
+
+            Swal.fire({
+                title: 'Sukses!',
+                text: result.message || 'Member berhasil ditambahkan',
+                icon: 'success',
+                confirmButtonText: 'OK'
+            });
+
+            // Reload members list
+            loadMembers();
+
+            // Clear form
+            clearForm();
         } catch (error) {
             console.error('Error adding member:', error);
             Swal.fire({
@@ -254,7 +256,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    
+
     function editMember(rfid, member) {
         selectedMember = { rfid, ...member };
         rfidInput.value = rfid;
@@ -262,28 +264,28 @@ document.addEventListener('DOMContentLoaded', function() {
         phoneInput.value = member.phone || '';
         emailInput.value = member.email || '';
         pointsInput.value = member.points || 0;
-        
+
         // Enable update and delete buttons
         updateBtn.disabled = false;
         deleteBtn.disabled = false;
         addBtn.disabled = true;
-        
+
         // Update preview
         updatePreview();
-        
+
         // Scroll to form
         rfidInput.scrollIntoView({ behavior: 'smooth' });
     }
-    
+
     async function updateMember() {
         if (!selectedMember) return;
-        
+
         const rfid = rfidInput.value.trim();
         const name = nameInput.value.trim();
         const phone = phoneInput.value.trim();
         const email = emailInput.value.trim();
         const points = parseInt(pointsInput.value) || 0;
-        
+
         if (!name) {
             Swal.fire({
                 title: 'Error!',
@@ -294,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nameInput.focus();
             return;
         }
-        
+
         try {
             const response = await fetch('/api/updateMember', {
                 method: 'POST',
@@ -309,9 +311,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     points
                 })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 Swal.fire({
                     title: 'Sukses!',
@@ -319,10 +321,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     icon: 'success',
                     confirmButtonText: 'OK'
                 });
-                
+
                 // Reload members list
                 loadMembers();
-                
+
                 // Clear form
                 clearForm();
             } else {
@@ -338,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    
+
     function confirmDeleteMember(rfid, name) {
         Swal.fire({
             title: 'Hapus Member?',
@@ -355,11 +357,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     async function deleteMember(rfid = null) {
         const memberRfid = rfid || selectedMember?.rfid;
         if (!memberRfid) return;
-        
+
         try {
             const response = await fetch('/api/deleteMember', {
                 method: 'POST',
@@ -368,9 +370,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({ rfid: memberRfid })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 Swal.fire({
                     title: 'Dihapus!',
@@ -378,10 +380,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     icon: 'success',
                     confirmButtonText: 'OK'
                 });
-                
+
                 // Reload members list
                 loadMembers();
-                
+
                 // Clear form
                 clearForm();
             } else {
@@ -397,38 +399,38 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    
+
     function clearForm() {
         rfidInput.value = '';
         nameInput.value = '';
         phoneInput.value = '';
         emailInput.value = '';
         pointsInput.value = '0';
-        
+
         selectedMember = null;
-        
+
         updateBtn.disabled = true;
         deleteBtn.disabled = true;
         addBtn.disabled = false;
-        
+
         updatePreview();
-        
+
         // Focus on RFID input for next scan
         rfidInput.focus();
     }
-    
+
     async function searchMembers() {
         const query = searchInput.value.trim().toLowerCase();
-        
+
         if (!query) {
             loadMembers();
             return;
         }
-        
+
         try {
             const response = await fetch('/api/getMembers');
             const members = await response.json();
-            
+
             if (members) {
                 const filteredMembers = Object.entries(members).reduce((acc, [rfid, member]) => {
                     if (
@@ -441,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     return acc;
                 }, {});
-                
+
                 renderMembersList(filteredMembers);
             }
         } catch (error) {
@@ -454,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    
+
     // Animation for barcode lines
     const barcodeLines = document.querySelectorAll('.barcode-line');
     barcodeLines.forEach((line, index) => {
